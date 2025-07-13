@@ -193,21 +193,53 @@
 
     function handleFileSelect(event) {
       const file = event.target.files[0];
+      if (!file || !file.name.endsWith(".xlsx")) {
+        alert("Please upload a valid .xlsx file.");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = function(e) {
         const data = e.target.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        displayData(jsonData);
+        if (jsonData.length === 0) {
+          alert("The file is empty or has no readable rows.");
+          return;
+        }
         originalData = jsonData;
+        queryInput.value = '';
+        displayData(jsonData);
       };
       reader.readAsBinaryString(file);
     }
 
+    function handleQuery() {
+      const query = queryInput.value.trim().toLowerCase();
+      if (!query || originalData.length === 0) {
+        displayData(originalData);
+        return;
+      }
+
+      const keywords = query.split(/\s+/).filter(kw => kw);
+
+      const filteredData = originalData.filter(item => {
+        const firstColumnKey = Object.keys(item)[0];
+        const firstColumnValue = (item[firstColumnKey] ?? '').toString().toLowerCase();
+        return keywords.every(kw => firstColumnValue.includes(kw));
+      });
+
+      displayData(filteredData);
+    }
+
     function displayData(data) {
       dataTable.innerHTML = '';
-      if (!data.length) return;
+
+      if (!data.length) {
+        dataTable.innerHTML = '<tr><td colspan="100%">No matching results found.</td></tr>';
+        return;
+      }
 
       const headerRow = dataTable.insertRow();
       for (const key in data[0]) {
@@ -220,27 +252,18 @@
         const row = dataTable.insertRow();
         for (const key in item) {
           const cell = row.insertCell();
-          if (typeof item[key] === 'number') {
+          const value = item[key];
+          if (typeof value === 'number') {
             if (key.toLowerCase().includes('price')) {
-              cell.textContent = item[key].toFixed(2);
+              cell.textContent = value.toFixed(2);
             } else {
-              cell.textContent = item[key];
+              cell.textContent = value;
             }
           } else {
-            cell.textContent = item[key];
+            cell.textContent = value ?? '';
           }
         }
       });
-    }
-
-    function handleQuery() {
-      const query = queryInput.value.trim().toLowerCase();
-      const keywords = query.split(' ').filter(kw => kw);
-      const filteredData = originalData.filter(item => {
-        const value = item[Object.keys(item)[0]].toString().toLowerCase();
-        return keywords.every(kw => value.includes(kw));
-      });
-      displayData(filteredData);
     }
   </script>
 </body>
